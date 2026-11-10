@@ -39,7 +39,7 @@ export class NotesStore {
   #tail = Promise.resolve();
   constructor({ actor = randomUUID(), directory = null, identity = randomUUID() } = {}) {
     checked(uuid(actor) && uuid(identity), 'Invalid store identity');
-    this.actor = actor; this.identity = identity; this.directory = directory; this.versions = new Map(); this.files = new Map();
+    this.actor = actor; this.identity = identity; this.directory = directory; this.versions = new Map(); this.files = new Map(); this.observed = new Map();
   }
   serial(task) { const next = this.#tail.then(task); this.#tail = next.catch(() => {}); return next; }
   static defaultDirectory(projectId, home = os.homedir()) {
@@ -79,6 +79,7 @@ export class NotesStore {
       const file = path.join(this.directory, entry.name);
       checked((await fs.stat(file)).size <= limits.text + 16384, 'External Markdown exceeds size limit');
       const text = await fs.readFile(file, 'utf8');
+      this.observed.set(entry.name,text);
       const match = /^---\nt3-note: (.+)\n---\n(?:!\[.*?\]\(assets\/[^)]+\)\n)?([\s\S]*)$/.exec(text);
       let note;
       if (match) {
@@ -152,11 +153,20 @@ export class NotesStore {
         await atomic(path.join(this.directory, 'assets', name), Buffer.from(data,'base64'));
         metadata.asset = { name };
       }
-      await atomic(path.join(this.directory, filename), `---\nt3-note: ${JSON.stringify(metadata)}\n---\n${metadata.asset ? `![${note.title.replace(/[\]\r\n]/g,'') }](assets/${metadata.asset.name})\n` : ''}${body}`);
+      const rendered = `---\nt3-note: ${JSON.stringify(metadata)}\n---\n${metadata.asset ? `![${note.title.replace(/[\]\r\n]/g,'') }](assets/${metadata.asset.name})\n` : ''}${body}`;
+      const target = path.join(this.directory,filename);
+      const current = await fs.readFile(target,'utf8').catch(e=>{if(e.code==='ENOENT') return null;throw e;});
+      if(current !== rendered) {
+        checked(current === null || current === this.observed.get(filename), 'File changed during save; refresh to import the concurrent edit');
+        await atomic(target,rendered);
+      }
       wanted.set(filename, { id: note.id, revision: note.revision, note: { ...note, body: "", asset: undefined, conflict: undefined } });
     }
     await atomic(path.join(this.directory, '.t3-notes', 'tombstones.json'), JSON.stringify([...this.versions.values()].flat().filter(n => n.deleted)));
-    for (const [file] of this.files) if (!wanted.has(file)) await fs.unlink(path.join(this.directory, file)).catch(e => { if (e.code !== 'ENOENT') throw e; });
+    for (const [file] of this.files) if (!wanted.has(file)) {
+      const current = await fs.readFile(path.join(this.directory,file),'utf8').catch(e=>{if(e.code==='ENOENT') return null;throw e;});
+      if(current !== null && current === this.observed.get(file)) await fs.unlink(path.join(this.directory,file));
+    }
     await atomic(path.join(this.directory, ".t3-notes", "inventory.json"), JSON.stringify([...wanted]));
     this.files = wanted;
   }
@@ -165,7 +175,7 @@ export class NotesStore {
       checked(path.isAbsolute(directory), 'Choose an absolute directory');
       await this.#scan();
       const old = this.directory, oldFiles = this.files;
-      this.directory = directory; this.files = new Map();
+      this.directory = directory; this.files = new Map(); this.observed = new Map();
       try { await this.#scan(); await this.#persist(); } catch (e) { this.directory = old; this.files = oldFiles; throw e; }
       return directory;
     });

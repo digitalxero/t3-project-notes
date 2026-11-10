@@ -2174,6 +2174,7 @@ var NotesStore = class {
     this.directory = directory;
     this.versions = /* @__PURE__ */ new Map();
     this.files = /* @__PURE__ */ new Map();
+    this.observed = /* @__PURE__ */ new Map();
   }
   serial(task) {
     const next = this.#tail.then(task);
@@ -2228,6 +2229,7 @@ var NotesStore = class {
       const file = path.join(this.directory, entry.name);
       checked((await fs.stat(file)).size <= limits.text + 16384, "External Markdown exceeds size limit");
       const text2 = await fs.readFile(file, "utf8");
+      this.observed.set(entry.name, text2);
       const match3 = /^---\nt3-note: (.+)\n---\n(?:!\[.*?\]\(assets\/[^)]+\)\n)?([\s\S]*)$/.exec(text2);
       let note;
       if (match3) {
@@ -2326,17 +2328,30 @@ var NotesStore = class {
         await atomic(path.join(this.directory, "assets", name), Buffer.from(data, "base64"));
         metadata.asset = { name };
       }
-      await atomic(path.join(this.directory, filename), `---
+      const rendered = `---
 t3-note: ${JSON.stringify(metadata)}
 ---
 ${metadata.asset ? `![${note.title.replace(/[\]\r\n]/g, "")}](assets/${metadata.asset.name})
-` : ""}${body}`);
+` : ""}${body}`;
+      const target = path.join(this.directory, filename);
+      const current = await fs.readFile(target, "utf8").catch((e) => {
+        if (e.code === "ENOENT") return null;
+        throw e;
+      });
+      if (current !== rendered) {
+        checked(current === null || current === this.observed.get(filename), "File changed during save; refresh to import the concurrent edit");
+        await atomic(target, rendered);
+      }
       wanted.set(filename, { id: note.id, revision: note.revision, note: { ...note, body: "", asset: void 0, conflict: void 0 } });
     }
     await atomic(path.join(this.directory, ".t3-notes", "tombstones.json"), JSON.stringify([...this.versions.values()].flat().filter((n) => n.deleted)));
-    for (const [file] of this.files) if (!wanted.has(file)) await fs.unlink(path.join(this.directory, file)).catch((e) => {
-      if (e.code !== "ENOENT") throw e;
-    });
+    for (const [file] of this.files) if (!wanted.has(file)) {
+      const current = await fs.readFile(path.join(this.directory, file), "utf8").catch((e) => {
+        if (e.code === "ENOENT") return null;
+        throw e;
+      });
+      if (current !== null && current === this.observed.get(file)) await fs.unlink(path.join(this.directory, file));
+    }
     await atomic(path.join(this.directory, ".t3-notes", "inventory.json"), JSON.stringify([...wanted]));
     this.files = wanted;
   }
@@ -2347,6 +2362,7 @@ ${metadata.asset ? `![${note.title.replace(/[\]\r\n]/g, "")}](assets/${metadata.
       const old = this.directory, oldFiles = this.files;
       this.directory = directory;
       this.files = /* @__PURE__ */ new Map();
+      this.observed = /* @__PURE__ */ new Map();
       try {
         await this.#scan();
         await this.#persist();
@@ -2519,7 +2535,7 @@ var plugin_default = {
       const base = { projectId };
       const blocks = [
         text("privacy", "Private to you. Never included in prompts or exposed as agent tools."),
-        { id: "notes", kind: "collection", queryField: "query", label: "Project notes", items: notes.filter((n) => `${n.title} ${n.body}`.toLocaleLowerCase().includes(String(input.query ?? "").toLocaleLowerCase())).map((n) => ({ id: `${n.id}:${n.revision}`, label: `${n.conflict ? "Conflict: " : ""}${n.title || "Untitled"}`.slice(0, 200), search: n.body.slice(0, 100), input: { selected: `${n.id}:${n.revision}` } })) },
+        { id: "notes", kind: "collection", queryField: "query", label: "Project notes", items: notes.filter((n) => `${n.title} ${n.body}`.toLocaleLowerCase().includes(String(input.query ?? "").toLocaleLowerCase())).map((n) => ({ id: `${n.id}:${n.revision}`, label: `${n.conflict ? "Conflict: " : ""}${n.title || "Untitled"}`.slice(0, 200), search: n.body.slice(0, 100), input: { selected: `${n.id}:${n.revision}`, selectedId: n.id } })) },
         form("create", "Create note", "create", [field("title", "Title", "text", ""), { ...field("kind", "Type", "select", "text"), options: [{ label: "Text", value: "text" }, { label: "Checklist", value: "checklist" }, { label: "Image", value: "image" }] }], base)
       ];
       if (selected) {
