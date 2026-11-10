@@ -2408,7 +2408,7 @@ var plugin_default = {
   apiVersion: 1,
   id: "project-notes",
   name: "Private Project Notes",
-  version: "1.0.0",
+  version: "0.1.0",
   description: "Private Markdown, checklist and image notes shared across project threads. Never sent to agents.",
   activate: (context2) => gen2(function* () {
     if (!context2.capabilities?.includes("portable-collections") || !context2.threads) throw new Error("Private notes requires the prototype host with portable-collections and thread-portability");

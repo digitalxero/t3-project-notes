@@ -1,1 +1,7 @@
-{"apiVersion":1,"id":"project-notes","name":"Private Project Notes","version":"1.0.0","main":"dist/plugin.mjs"}
+{
+  "apiVersion": 1,
+  "id": "project-notes",
+  "name": "Private Project Notes",
+  "version": "0.1.0",
+  "main": "dist/plugin.mjs"
+}

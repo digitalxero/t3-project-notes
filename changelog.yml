@@ -1,0 +1,59 @@
+- semver: 0.1.0
+  date: 2026-11-10T11:27:21.998819306-08:00
+  packager: DigitalXero
+  changes:
+    - commit: fe62bf86c77caf9d18b2d183508bd47ab590e70f
+      note: |-
+        fix: retain project identity and concurrent note revisions (#1)
+
+        fix: preserve project identity and draft revisions through lifecycle changes
+      author:
+        name: Dj Gilcrease
+        email: digitalxero@gmail.com
+      committer:
+        name: GitHub
+        email: noreply@github.com
+      conventional_commit:
+        category: fix
+        scope: ""
+        description: retain project identity and concurrent note revisions (#1)
+        body: ""
+        footer:
+            - 'fix: preserve project identity and draft revisions through lifecycle changes'
+        major: false
+        minor: false
+        patch: true
+    - commit: 2e38b33805e5f441958df48879febd6466fd284f
+      note: 'fix: retain concurrent external edits and rebuild the plugin bundle'
+      author:
+        name: Dj Gilcrease
+        email: digitalxero@gmail.com
+      committer:
+        name: Dj Gilcrease
+        email: digitalxero@gmail.com
+      conventional_commit:
+        category: fix
+        scope: ""
+        description: retain concurrent external edits and rebuild the plugin bundle
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: true
+    - commit: 57a03cfd78ce0bd1a6e6920c55f2675e466847dc
+      note: 'feat: add private Markdown project notes and bounded environment sync'
+      author:
+        name: Dj Gilcrease
+        email: digitalxero@gmail.com
+      committer:
+        name: Dj Gilcrease
+        email: digitalxero@gmail.com
+      conventional_commit:
+        category: feat
+        scope: ""
+        description: add private Markdown project notes and bounded environment sync
+        body: ""
+        footer: []
+        major: false
+        minor: true
+        patch: false
