@@ -64,6 +64,11 @@ export class NotesStore {
   async #scan() {
     if (!this.directory) return;
     await fs.mkdir(this.directory, { recursive: true, mode: 0o700 });
+    const identityPath = path.join(this.directory, '.t3-notes', 'project.json');
+    if (await fileExists(identityPath)) {
+      checked((await fs.stat(identityPath)).size <= 1024, 'Invalid project identity file');
+      checked(JSON.parse(await fs.readFile(identityPath,'utf8')).identity === this.identity, 'This directory belongs to a different notes project');
+    }
     if (this.files.size === 0) {
       const inventory = path.join(this.directory, '.t3-notes', 'inventory.json');
       if (await fileExists(inventory)) {
@@ -142,6 +147,7 @@ export class NotesStore {
   snapshot() { return { version: 1, identity: this.identity, notes: structuredClone([...this.versions.values()].flat()) }; }
   async #persist() {
     if (!this.directory) return;
+    await atomic(path.join(this.directory,".t3-notes","project.json"), JSON.stringify({version:1,identity:this.identity}));
     const wanted = new Map();
     for (const note of this.list()) {
       const existing = [...this.files].find(([,n]) => n.id === note.id && n.revision === note.revision)?.[0];
@@ -169,6 +175,13 @@ export class NotesStore {
     }
     await atomic(path.join(this.directory, ".t3-notes", "inventory.json"), JSON.stringify([...wanted]));
     this.files = wanted;
+  }
+  async reidentify(identity) {
+    return this.serial(async () => {
+      checked(uuid(identity) && this.versions.size === 0, 'Only empty projects can change identity');
+      if(this.directory) await atomic(path.join(this.directory,'.t3-notes','project.json'),JSON.stringify({version:1,identity}));
+      this.identity = identity;
+    });
   }
   async relocate(directory) {
     return this.serial(async () => {

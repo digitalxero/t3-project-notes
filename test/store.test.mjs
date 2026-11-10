@@ -82,3 +82,9 @@ test('offline filesystem deletion survives restart as a tombstone',async t=>{
   await fs.unlink(path.join(directory,(await fs.readdir(directory)).find(n=>n.endsWith('.md'))));
   const restarted=await new NotesStore({directory,identity}).open();await other.merge(restarted.snapshot());assert.equal(other.list().length,0);
 });
+test('a directory from a different project is never silently merged',async t=>{
+ const directory=await temp(t),a=await new NotesStore({directory}).open();await a.save({body:'private project A'});
+ await assert.rejects(new NotesStore({directory}).open(),/different notes project/);
+ const b=new NotesStore();await assert.rejects(b.relocate(directory),/different notes project/);
+ assert.equal((await new NotesStore({directory,identity:a.identity}).open()).list()[0].body,'private project A');
+});

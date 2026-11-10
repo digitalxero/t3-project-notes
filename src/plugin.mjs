@@ -30,7 +30,11 @@ export default {
     const storeFor = async projectId => {
       checkedId(projectId);
       if (stores.has(projectId)) return stores.get(projectId);
-      if (!config[projectId]) { config[projectId] = { identity:randomUUID(), directory:NotesStore.defaultDirectory(projectId) }; await saveConfig(); }
+      if (!config[projectId]) {
+        const directory = NotesStore.defaultDirectory(projectId);
+        const saved = await fs.readFile(path.join(directory,'.t3-notes','project.json'),'utf8').then(JSON.parse,e=>{if(e.code==='ENOENT')return null;throw e;});
+        config[projectId] = { identity:saved?.identity ?? randomUUID(), directory }; await saveConfig();
+      }
       const pending = new NotesStore(config[projectId]).open(); stores.set(projectId,pending);
       try { const store = await pending; stores.set(projectId,store); return store; } catch(e) { stores.delete(projectId); throw e; }
     };
@@ -52,7 +56,7 @@ export default {
         const directory = String(input.directory || NotesStore.defaultDirectory(projectId));
         if (input.identity && input.identity !== store.identity) {
           if (!uuid(input.identity) || store.snapshot().notes.length) return notice('Set a shared identity only for an empty project. Export or move existing notes first.','danger');
-          store.identity = input.identity;
+          await store.reidentify(input.identity);
         }
         await store.relocate(directory);
         config[projectId] = {identity:store.identity,directory:store.directory}; await saveConfig();
@@ -129,7 +133,7 @@ export default {
       if (selected) {
         const ref = {...base,id:selected.id,revision:selected.revision};
         if (selected.asset) blocks.push({id:'image',kind:'image',label:selected.title,source:`data:image/${selected.asset.name.endsWith('.jpg')?'jpeg':selected.asset.name.split('.')[1]};base64,${selected.asset.data}`});
-        blocks.push(form('edit','Save note','save',[field('title','Title','text',selected.title),field('body',selected.kind==='checklist'?'Checklist (one “- [ ] item” per line)':'Note','multiline',selected.body),...(selected.kind==='image'?[field('image','Image (PNG/JPEG/GIF/WebP, at most 64 KiB)','image','')]:[])],ref));
+        blocks.push({...form('edit','Save note','save',[field('title','Title','text',selected.title),field('body',selected.kind==='checklist'?'Checklist (one “- [ ] item” per line)':'Note','multiline',selected.body),...(selected.kind==='image'?[field('image','Image (PNG/JPEG/GIF/WebP, at most 64 KiB)','image','')]:[])],ref),instance:String(input.selected ?? selected.id)});
         if(selected.kind==='checklist') blocks.push({id:'items',kind:'table',columns:['Checklist'],rows:selected.body.split('\n').slice(0,80).map((line,index)=>({id:String(index),cells:[line],actions:[action(`toggle-${index}`,'Toggle','checklist',{...ref,index,operation:'toggle'}),action(`up-${index}`,'↑','checklist',{...ref,index,operation:'up'}),action(`down-${index}`,'↓','checklist',{...ref,index,operation:'down'})]}))});
         blocks.push({id:'delete',kind:'actions',actions:[action('delete','Delete this version','delete',ref)]});
       }
