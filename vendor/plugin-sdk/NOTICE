@@ -1,1 +1,1 @@
-SDK snapshot copied from packages/plugin-sdk/src/index.ts in djgilcrease/t3code's prototype plugin-host fork, including the portable collections additions developed with this plugin. Original MIT terms are in LICENSE. Source provenance will be pinned to the merged host revision before stable release.
+SDK snapshot copied from packages/plugin-sdk/src/index.ts at djgilcrease/t3code commit a3e3291a18864ca85347fffa2373f04160f91f75 in the prototype plugin-host fork. Original MIT terms are in LICENSE. No server internals are imported by the plugin.

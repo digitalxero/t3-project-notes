@@ -4,7 +4,7 @@ An external plugin for the **prototype djgilcrease/t3code plugin-host fork**. Th
 
 ## Install
 
-Requires the prototype host with `portable-collections` and `thread-portability` capabilities. A precise tested host commit will be recorded before the stable release.
+Requires the prototype host with `portable-collections` and `thread-portability` capabilities. The tested integrated host is [`a3e3291a18864ca85347fffa2373f04160f91f75`](https://github.com/djgilcrease/t3code/commit/a3e3291a18864ca85347fffa2373f04160f91f75) on `t3/create-plugin-system`. Upstream T3 Code does not include these prototype APIs.
 
 Paste `https://github.com/digitalxero/t3-project-notes` into Settings → Plugins. The tagged repository contains a self-contained `dist/plugin.mjs`; no package installation or build runs on the user's environment.
 
@@ -30,4 +30,6 @@ Limits: 200 note IDs (including tombstones), 20 concurrent versions per note, 16
 
 Node 24.10 or newer; `npm ci`, `npm run verify` (or `task verify`). The SDK snapshot in `vendor/plugin-sdk` comes from the MIT-licensed prototype host and is used to validate portable UI output. The bundle includes Effect under its MIT license; see `licenses/Effect-MIT.txt`. No server internals are imported.
 
-Stable release and platform verification are pending. Do not interpret source publication as completed delivery.
+Verification: storage/plugin tests cover persistence, offline filesystem edits/deletion, durable replicas, project isolation, conflict copies, image transfer and bounded two-way sync. The integrated Linux web client was used to create, open and edit a note, and its Markdown was checked on disk. The normal packaged host worker was used to load the self-contained entrypoint, create/read/edit a note and restart without losing it. Desktop shares the web renderer; native Electron and iOS/Android device behavior have not been exercised. Host affected typechecks, React Compiler checks and focused tests passed locally. Full hosted host CI remained queued at verification time; it is not claimed as passing.
+
+Run `node scripts/verify-packaged-host.mjs <host-checkout>` after building that host with `vp run --filter t3 build:bundle`. It uses the packaged CLI's supervised worker and isolated temporary directories. Repository-URL verification is recorded in the GitHub release once complete.

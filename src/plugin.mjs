@@ -14,7 +14,7 @@ const checkedId = id => { if (typeof id !== 'string' || !id || id.length > 200 |
 const uuid = value => typeof value === 'string' && /^[a-f0-9-]{36}$/.test(value);
 
 export default {
-  apiVersion:1, id:'project-notes', name:'Private Project Notes', version:'1.0.0',
+  apiVersion:1, id:'project-notes', name:'Private Project Notes', version:'0.1.0',
   description:'Private Markdown, checklist and image notes shared across project threads. Never sent to agents.',
   activate: context => Effect.gen(function* () {
     if (!context.capabilities?.includes('portable-collections') || !context.threads) throw new Error('Private notes requires the prototype host with portable-collections and thread-portability');

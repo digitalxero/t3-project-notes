@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/djgilcrease/t3code",
+  "branch": "t3/create-plugin-system",
+  "testedCommit": "a3e3291a18864ca85347fffa2373f04160f91f75",
+  "apiVersion": 1,
+  "capabilities": [
+    "portable-collections",
+    "thread-portability"
+  ],
+  "upstreamApproval": false
+}
