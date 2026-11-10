@@ -2214,6 +2214,11 @@ var NotesStore = class {
   async #scan() {
     if (!this.directory) return;
     await fs.mkdir(this.directory, { recursive: true, mode: 448 });
+    const identityPath = path.join(this.directory, ".t3-notes", "project.json");
+    if (await fileExists(identityPath)) {
+      checked((await fs.stat(identityPath)).size <= 1024, "Invalid project identity file");
+      checked(JSON.parse(await fs.readFile(identityPath, "utf8")).identity === this.identity, "This directory belongs to a different notes project");
+    }
     if (this.files.size === 0) {
       const inventory = path.join(this.directory, ".t3-notes", "inventory.json");
       if (await fileExists(inventory)) {
@@ -2317,6 +2322,7 @@ var NotesStore = class {
   }
   async #persist() {
     if (!this.directory) return;
+    await atomic(path.join(this.directory, ".t3-notes", "project.json"), JSON.stringify({ version: 1, identity: this.identity }));
     const wanted = /* @__PURE__ */ new Map();
     for (const note of this.list()) {
       const existing = [...this.files].find(([, n]) => n.id === note.id && n.revision === note.revision)?.[0];
@@ -2354,6 +2360,13 @@ ${metadata.asset ? `![${note.title.replace(/[\]\r\n]/g, "")}](assets/${metadata.
     }
     await atomic(path.join(this.directory, ".t3-notes", "inventory.json"), JSON.stringify([...wanted]));
     this.files = wanted;
+  }
+  async reidentify(identity2) {
+    return this.serial(async () => {
+      checked(uuid(identity2) && this.versions.size === 0, "Only empty projects can change identity");
+      if (this.directory) await atomic(path.join(this.directory, ".t3-notes", "project.json"), JSON.stringify({ version: 1, identity: identity2 }));
+      this.identity = identity2;
+    });
   }
   async relocate(directory) {
     return this.serial(async () => {
@@ -2416,7 +2429,12 @@ var plugin_default = {
       checkedId(projectId);
       if (stores.has(projectId)) return stores.get(projectId);
       if (!config[projectId]) {
-        config[projectId] = { identity: randomUUID2(), directory: NotesStore.defaultDirectory(projectId) };
+        const directory = NotesStore.defaultDirectory(projectId);
+        const saved = await fs2.readFile(path2.join(directory, ".t3-notes", "project.json"), "utf8").then(JSON.parse, (e) => {
+          if (e.code === "ENOENT") return null;
+          throw e;
+        });
+        config[projectId] = { identity: saved?.identity ?? randomUUID2(), directory };
         await saveConfig();
       }
       const pending = new NotesStore(config[projectId]).open();
@@ -2448,7 +2466,7 @@ var plugin_default = {
         const directory = String(input.directory || NotesStore.defaultDirectory(projectId));
         if (input.identity && input.identity !== store.identity) {
           if (!uuid2(input.identity) || store.snapshot().notes.length) return notice("Set a shared identity only for an empty project. Export or move existing notes first.", "danger");
-          store.identity = input.identity;
+          await store.reidentify(input.identity);
         }
         await store.relocate(directory);
         config[projectId] = { identity: store.identity, directory: store.directory };
@@ -2541,7 +2559,7 @@ var plugin_default = {
       if (selected) {
         const ref = { ...base, id: selected.id, revision: selected.revision };
         if (selected.asset) blocks.push({ id: "image", kind: "image", label: selected.title, source: `data:image/${selected.asset.name.endsWith(".jpg") ? "jpeg" : selected.asset.name.split(".")[1]};base64,${selected.asset.data}` });
-        blocks.push(form("edit", "Save note", "save", [field("title", "Title", "text", selected.title), field("body", selected.kind === "checklist" ? "Checklist (one \u201C- [ ] item\u201D per line)" : "Note", "multiline", selected.body), ...selected.kind === "image" ? [field("image", "Image (PNG/JPEG/GIF/WebP, at most 64 KiB)", "image", "")] : []], ref));
+        blocks.push({ ...form("edit", "Save note", "save", [field("title", "Title", "text", selected.title), field("body", selected.kind === "checklist" ? "Checklist (one \u201C- [ ] item\u201D per line)" : "Note", "multiline", selected.body), ...selected.kind === "image" ? [field("image", "Image (PNG/JPEG/GIF/WebP, at most 64 KiB)", "image", "")] : []], ref), instance: String(input.selected ?? selected.id) });
         if (selected.kind === "checklist") blocks.push({ id: "items", kind: "table", columns: ["Checklist"], rows: selected.body.split("\n").slice(0, 80).map((line, index) => ({ id: String(index), cells: [line], actions: [action(`toggle-${index}`, "Toggle", "checklist", { ...ref, index, operation: "toggle" }), action(`up-${index}`, "\u2191", "checklist", { ...ref, index, operation: "up" }), action(`down-${index}`, "\u2193", "checklist", { ...ref, index, operation: "down" })] })) });
         blocks.push({ id: "delete", kind: "actions", actions: [action("delete", "Delete this version", "delete", ref)] });
       }
